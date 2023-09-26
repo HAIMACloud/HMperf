@@ -39,17 +39,34 @@ func main() {
 		info, _ := json.MarshalIndent(pkgInfo, "", "  ")
 		fmt.Println(string(info))
 		return
+	} else if data.GetCmdParameters().IsListRunning {
+		pkgInfo, err := utils.NewAndroidShell().GetAllRunningPackages()
+		if err != nil {
+			fmt.Println("ERROR:", err.Error())
+			return
+		}
+		info, _ := json.MarshalIndent(pkgInfo, "", "  ")
+		fmt.Println(string(info))
+		return
+	} else if data.GetCmdParameters().Ask != "" {
+		answer, err := stat.AskPipelineServer(data.GetCmdParameters().Ask)
+		if err != nil {
+			fmt.Println("ERROR:", err.Error())
+			return
+		}
+		fmt.Println(answer)
+		return
 	}
 
 	utils.InitLogger()
 
 	c := make(chan os.Signal, 1)
-
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	mgmt := stat.InitStatByType([]string{"system", "display", "network"})
+	mgmt := stat.InitStatByType([]string{"system", "display", "network", "ping"})
 	go mgmt.Start(1)
 	defer stat.UnloadPlugins()
 
+	go stat.NewPipelineServerListen()
 	<-c
 }

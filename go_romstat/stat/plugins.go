@@ -37,6 +37,7 @@ func LoadAllPlugins() {
 	RegPlugin("system", new(plugins.SystemStatPlugin))
 	RegPlugin("display", new(plugins.SfLatencyStatPlugin))
 	RegPlugin("network", new(plugins.NetworkStatPlugin))
+	RegPlugin("ping", new(plugins.NetworkPingPlugin))
 }
 
 func UnloadPlugins() {

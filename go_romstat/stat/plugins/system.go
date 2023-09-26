@@ -40,8 +40,8 @@ func (c *SystemStatPlugin) Open() bool {
 
 func (c *SystemStatPlugin) cpuStat() {
 	for {
-		if data.GetCmdParameters().Pid != 0 {
-			ps, _ := process.NewProcess(int32(data.GetCmdParameters().Pid))
+		if pid := data.GetCmdParameters().GetPid(); pid != 0 {
+			ps, _ := process.NewProcess(pid)
 			percent, err := ps.Percent(c.collectSecTime)
 			if err != nil {
 				panic("cpu collect error")
@@ -60,8 +60,8 @@ func (c *SystemStatPlugin) cpuStat() {
 
 func (c *SystemStatPlugin) memStat() {
 	for {
-		if data.GetCmdParameters().Pid != 0 {
-			ps, _ := process.NewProcess(int32(data.GetCmdParameters().Pid))
+		if pid := data.GetCmdParameters().GetPid(); pid != 0 {
+			ps, _ := process.NewProcess(pid)
 			memPercent, _ := ps.MemoryPercent()
 			memInfo, err := ps.MemoryInfo()
 			if err != nil {

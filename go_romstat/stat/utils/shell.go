@@ -5,10 +5,14 @@ package utils
 
 import (
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/shirou/gopsutil/process"
 
 	"romstat/apk"
 )
@@ -83,6 +87,16 @@ func (t *AndroidShell) GetPackagePath(pkgName string) string {
 	}
 	return ""
 }
+func (t *AndroidShell) GetAllInstalledPackages() []string {
+	output := t.RunShell("pm list packages")
+	allPackageLines := strings.Split(output, "\n")
+	installedPackages := make([]string, 0)
+	for _, line := range allPackageLines {
+		pkgFile := strings.Join(strings.Split(line, ":")[1:], ":")
+		installedPackages = append(installedPackages, pkgFile)
+	}
+	return installedPackages
+}
 
 type PackageInfo struct {
 	Name        string `json:"name"`
@@ -113,4 +127,112 @@ func (t *AndroidShell) GetPackageInfo(pkgName string) (*PackageInfo, error) {
 		PackageName: pkgName,
 		Icon:        baseImg,
 	}, nil
+}
+
+type RunningPackageInfo struct {
+	Name    string `json:"name"`
+	Pid     int32  `json:"pid"`
+	Topmost bool   `json:"topmost"`
+}
+
+func (t *AndroidShell) GetRecentApps() ([]string, error) {
+	output := t.RunShell(" dumpsys activity recents |grep mRootProcess")
+	r := regexp.MustCompile("ProcessRecord{(.*)}")
+	retLst := r.FindAllStringSubmatch(output, -1)
+	if len(retLst) <= 1 {
+		return nil, errors.New("not found")
+	}
+	recentApps := make([]string, 0)
+	for _, v := range retLst {
+		if len(v) <= 1 {
+			continue
+		}
+		startIdx := strings.Index(v[1], ":") + 1
+		endIdx := strings.Index(v[1], "/")
+		if startIdx < 0 || endIdx < 0 {
+			continue
+		}
+		pkgName := v[1][startIdx:endIdx]
+		recentApps = append(recentApps, pkgName)
+	}
+	return recentApps, nil
+}
+func (t *AndroidShell) GetAllRunningPackages() ([]*RunningPackageInfo, error) {
+	allRecentPackages, err := t.GetRecentApps()
+	if err != nil {
+		allRecentPackages = t.GetAllInstalledPackages()
+	}
+	topMostPackage := t.GetTopmostPackage(t.GetSdkVersion())
+	allRecentPackages = append(allRecentPackages, topMostPackage)
+	processes, err := process.Processes()
+	if err != nil {
+		return nil, err
+	}
+	allRunningPackages := make([]*RunningPackageInfo, 0)
+	for _, p := range processes {
+		processName, _ := p.Name()
+		if StringInSlice(processName, allRecentPackages) {
+			isTopmost := false
+			if topMostPackage == processName {
+				isTopmost = true
+			}
+			allRunningPackages = append(allRunningPackages, &RunningPackageInfo{
+				Name:    processName,
+				Pid:     p.Pid,
+				Topmost: isTopmost,
+			})
+		}
+	}
+
+	return allRunningPackages, nil
+}
+
+func (t *AndroidShell) GetPackagePid(pkgName string) (int32, error) {
+	processes, err := process.Processes()
+	if err != nil {
+		return 0, err
+	}
+	for _, p := range processes {
+		processName, _ := p.Name()
+		if pkgName == processName {
+			return p.Pid, nil
+		}
+
+	}
+	return 0, errors.New("process not found")
+}
+
+type PingStat struct {
+	SendPackages int
+	RecvPackages int
+	RssLst       []float64
+}
+
+func (t *AndroidShell) GetPingStat(domainAddr string, packCount int) (*PingStat, error) {
+	output := t.RunShell(fmt.Sprintf("ping -c %d -i 0.2 -W 1000 %s", packCount, domainAddr))
+	rRss := regexp.MustCompile("time=(.*) ms")
+	matchLst := rRss.FindAllStringSubmatch(output, -1)
+	retPingStat := &PingStat{
+		SendPackages: packCount,
+	}
+	if len(matchLst) >= 1 {
+		rssLst := make([]float64, 0)
+		for _, match := range matchLst {
+			rss, err := strconv.ParseFloat(match[1], 64)
+			if err != nil {
+				continue
+			}
+			rssLst = append(rssLst, rss)
+		}
+		retPingStat.RssLst = rssLst
+	}
+
+	rSendRecv := regexp.MustCompile("packets transmitted, (.*) received")
+	recvPackages := rSendRecv.FindStringSubmatch(output)
+	if len(recvPackages) >= 1 {
+		retPingStat.SendPackages = packCount
+		recvPacks, _ := strconv.ParseInt(recvPackages[1], 10, 64)
+		retPingStat.RecvPackages = int(recvPacks)
+	}
+	return retPingStat, nil
 }

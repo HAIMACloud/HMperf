@@ -53,9 +53,11 @@ func (t *PluginManager) outputHeaderLines() {
 		if v == "system" {
 			lines = append(lines, "   --------system-------")
 		} else if v == "display" {
-			lines = append(lines, "-----------display-----------")
+			lines = append(lines, "---------------display--------------")
 		} else if v == "network" {
 			lines = append(lines, "----network----")
+		} else if v == "ping" {
+			lines = append(lines, "----ping----")
 		}
 	}
 	t.displayLogger.Println(strings.Join(lines, "    "))

@@ -12,6 +12,7 @@ import (
 	"github.com/shirou/gopsutil/process"
 
 	"romstat/stat/data"
+	"romstat/stat/utils"
 )
 
 type NetData struct {
@@ -53,9 +54,9 @@ func (t *NetworkStatPlugin) GetTypes() []*data.PluginType {
 func (t *NetworkStatPlugin) GetData() map[string]string {
 	oldTs := t.lastTimestamp
 	var sendDert, recvDert uint64
-	if data.GetCmdParameters().Pid != 0 {
+	if pid := data.GetCmdParameters().GetPid(); pid != 0 {
 		//Network data related for given process
-		ps, _ := process.NewProcess(int32(data.GetCmdParameters().Pid))
+		ps, _ := process.NewProcess(pid)
 		t.netInfo, _ = ps.NetIOCounters(true)
 	} else {
 		t.netInfo, _ = net.IOCounters(true)
@@ -66,10 +67,15 @@ func (t *NetworkStatPlugin) GetData() map[string]string {
 			//Only retain the rmnet and wlan, except the ccmni Network
 			//Avoid double counting on some mobile phones
 			if !strings.HasPrefix(v.Name, "rmnet_data") &&
-				strings.HasPrefix(v.Name, "ccmni") &&
+				!strings.HasPrefix(v.Name, "ccmni") &&
 				!strings.HasPrefix(v.Name, "wlan") {
 				continue
 			}
+			//BUGFIX: log collected network interface for debug information
+			utils.DebugLogger.Println("NETWORK", v.Name, !strings.HasPrefix(v.Name, "rmnet_data"),
+				!strings.HasPrefix(v.Name, "ccmni"),
+				!strings.HasPrefix(v.Name, "wlan"))
+
 			sendDert += v.BytesSent - t.lastNetStatData[idx].BytesSend
 			recvDert += v.BytesRecv - t.lastNetStatData[idx].BytesRecv
 			t.lastNetStatData[idx] = &NetData{BytesSend: v.BytesSent, BytesRecv: v.BytesRecv}

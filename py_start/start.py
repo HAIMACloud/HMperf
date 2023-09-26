@@ -63,6 +63,7 @@ def main():
 
     """
     try:
+        get_rsa()
         push_romstat(sys.argv[1])
     except:
         rt = os.popen('adb devices').readlines()
