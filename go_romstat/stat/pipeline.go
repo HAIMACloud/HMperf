@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/firstrow/tcp_server"
@@ -21,6 +22,9 @@ import (
 var localAddress = "127.0.0.1:38421"
 
 func NewPipelineServerListen() {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	log.Default().SetOutput(io.Discard)
 	server := tcp_server.New(localAddress)
 	server.OnNewMessage(func(c *tcp_server.Client, message string) {
@@ -30,6 +34,9 @@ func NewPipelineServerListen() {
 	server.Listen()
 }
 func cmdOperator(writer io.Writer, cmdLine string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	if cmdLine == "current_pkg_surface" {
 		sfLatencyStatPlugin := reflect.ValueOf(registerPlugins["display"]).Interface().(*plugins.SfLatencyStatPlugin)
 		pkgName, surfaceView := sfLatencyStatPlugin.GetCurrentPkgSurface()

@@ -5,6 +5,7 @@ package plugins
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,6 +25,8 @@ type NetworkStatPlugin struct {
 	netInfo         []net.IOCountersStat
 	lastTimestamp   int64
 	lastNetStatData map[int]*NetData
+	sendPerSec      float64
+	recvPerSec      float64
 }
 
 func (t *NetworkStatPlugin) Open() bool {
@@ -42,6 +45,7 @@ func (t *NetworkStatPlugin) Run() {
 		t.lastNetStatData[idx] = &NetData{BytesSend: v.BytesSent, BytesRecv: v.BytesRecv}
 	}
 	t.lastTimestamp = time.Now().UnixNano()
+	go utils.SetTimer(1, t.goNetworkStatBySeconds)
 }
 
 func (t *NetworkStatPlugin) GetTypes() []*data.PluginType {
@@ -51,7 +55,7 @@ func (t *NetworkStatPlugin) GetTypes() []*data.PluginType {
 	}
 }
 
-func (t *NetworkStatPlugin) GetData() map[string]string {
+func (t *NetworkStatPlugin) goNetworkStatBySeconds() {
 	oldTs := t.lastTimestamp
 	var sendDert, recvDert uint64
 	if pid := data.GetCmdParameters().GetPid(); pid != 0 {
@@ -63,19 +67,24 @@ func (t *NetworkStatPlugin) GetData() map[string]string {
 	}
 	for idx, v := range t.netInfo {
 		if _, ok := t.lastNetStatData[idx]; ok {
-			//BUGFIX:
-			//Only retain the rmnet and wlan, except the ccmni Network
-			//Avoid double counting on some mobile phones
-			if !strings.HasPrefix(v.Name, "rmnet_data") &&
-				!strings.HasPrefix(v.Name, "ccmni") &&
-				!strings.HasPrefix(v.Name, "wlan") {
-				continue
+			if runtime.GOOS != "windows" {
+				//BUGFIX:
+				//Only retain the rmnet and wlan, except the ccmni Network
+				//Avoid double counting on some mobile phones
+				if !strings.HasPrefix(v.Name, "rmnet_data") &&
+					!strings.HasPrefix(v.Name, "ccmni") &&
+					!strings.HasPrefix(v.Name, "wlan") {
+					continue
+				}
+				//BUGFIX: log collected network interface for debug information
+				utils.DebugLogger.Println("NETWORK", v.Name, !strings.HasPrefix(v.Name, "rmnet_data"),
+					!strings.HasPrefix(v.Name, "ccmni"),
+					!strings.HasPrefix(v.Name, "wlan"))
+			} else {
+				if strings.HasPrefix(v.Name, "Loopback Pseudo-Interface") {
+					continue
+				}
 			}
-			//BUGFIX: log collected network interface for debug information
-			utils.DebugLogger.Println("NETWORK", v.Name, !strings.HasPrefix(v.Name, "rmnet_data"),
-				!strings.HasPrefix(v.Name, "ccmni"),
-				!strings.HasPrefix(v.Name, "wlan"))
-
 			sendDert += v.BytesSent - t.lastNetStatData[idx].BytesSend
 			recvDert += v.BytesRecv - t.lastNetStatData[idx].BytesRecv
 			t.lastNetStatData[idx] = &NetData{BytesSend: v.BytesSent, BytesRecv: v.BytesRecv}
@@ -84,11 +93,13 @@ func (t *NetworkStatPlugin) GetData() map[string]string {
 	t.lastTimestamp = time.Now().UnixNano()
 
 	timeDert := float64(t.lastTimestamp-oldTs) / float64(time.Second)
-	sendPerSec := float64(sendDert) / timeDert
-	recvPerSec := float64(recvDert) / timeDert
+	t.sendPerSec = float64(sendDert) / timeDert
+	t.recvPerSec = float64(recvDert) / timeDert
+}
 
+func (t *NetworkStatPlugin) GetData() map[string]string {
 	return map[string]string{
-		"net_in":  fmt.Sprintf("%.6f", recvPerSec/1024)[0:6],
-		"net_out": fmt.Sprintf("%.6f", sendPerSec/1024)[0:6],
+		"net_in":  fmt.Sprintf("%.6f", t.recvPerSec/1024)[0:6],
+		"net_out": fmt.Sprintf("%.6f", t.sendPerSec/1024)[0:6],
 	}
 }

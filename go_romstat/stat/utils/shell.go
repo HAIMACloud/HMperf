@@ -58,7 +58,7 @@ func (t *AndroidShell) GetSdkVersion() int64 {
 
 func (t *AndroidShell) GetTopmostPackage(sdkVersion int64) string {
 	var output string
-	if sdkVersion == 33 {
+	if sdkVersion >= 33 {
 		output = t.RunShell("dumpsys activity activities |grep topResumedActivity")
 	} else {
 		output = t.RunShell("dumpsys activity activities |grep mResumedActivity")

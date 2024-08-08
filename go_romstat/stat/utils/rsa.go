@@ -80,6 +80,7 @@ func (t *RsaWriter) WriteString(sz string) {
 func (t *RsaWriter) Flush() {
 	encryptString := t.rsaEncrypt([]byte(t.currentLine))
 	t.safeWriteString(base64.StdEncoding.EncodeToString(encryptString) + "\n")
+	// t.safeWriteString(t.currentLine)
 	_ = t.fpWriter.Flush()
 	t.currentLine = ""
 }

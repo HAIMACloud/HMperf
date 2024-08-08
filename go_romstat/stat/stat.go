@@ -6,6 +6,7 @@ package stat
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -88,7 +89,11 @@ func initFpOutput() {
 		pemContent := string(fContent)
 		pubKey = &pemContent
 	}
-	fpWriter = utils.NewRsaWriter("/data/local/tmp/out.hmp", pubKey)
+	if runtime.GOOS == "windows" {
+		fpWriter = utils.NewRsaWriter("./out.hmp", pubKey)
+	} else {
+		fpWriter = utils.NewRsaWriter("/data/local/tmp/out.hmp", pubKey)
+	}
 }
 
 func InitStatByType(typeLst []string) *PluginManager {

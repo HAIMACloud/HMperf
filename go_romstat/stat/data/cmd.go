@@ -5,6 +5,11 @@ package data
 
 import (
 	"flag"
+	"log"
+	"net/http"
+	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/shirou/gopsutil/process"
 )
@@ -37,8 +42,27 @@ func (t *CmdlineParameters) getPkgRunningPid() int32 {
 	}
 	return 0
 }
+
+var runningPid int32
+var runningPidLastUpdated time.Time
+
 func (t *CmdlineParameters) GetPid() int32 {
-	return t.getPkgRunningPid()
+	if t.PkgName == "" {
+		return 0
+	}
+	if runningPid != 0 && time.Since(runningPidLastUpdated) < 10*time.Second {
+		_, err := process.NewProcess(runningPid)
+		if err != nil {
+			runningPid = t.getPkgRunningPid()
+			runningPidLastUpdated = time.Now()
+			return runningPid
+		}
+		return runningPid
+	} else {
+		runningPid = t.getPkgRunningPid()
+		runningPidLastUpdated = time.Now()
+		return runningPid
+	}
 }
 
 var cmdParameters CmdlineParameters
@@ -58,6 +82,12 @@ func InitCmdParser() {
 		if len(flag.Args()) >= 1 {
 			cmdParameters.PkgName = flag.Args()[0]
 		}
+	}
+	if cmdParameters.IsDebug {
+		//for debug
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
 	}
 }
 

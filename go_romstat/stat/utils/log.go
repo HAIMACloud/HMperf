@@ -6,6 +6,7 @@ package utils
 import (
 	"log"
 	"os"
+	"runtime"
 
 	"romstat/stat/data"
 )
@@ -30,8 +31,12 @@ type DebugLoggerInstance struct {
 }
 
 func NewDebugLogger() *DebugLoggerInstance {
+	debugLogFile := "/data/local/tmp/romstat_d.log"
+	if runtime.GOOS == "windows" {
+		debugLogFile = "romstat_d.log"
+	}
 	if data.GetCmdParameters().IsDebug {
-		file, err := os.OpenFile("/data/local/tmp/romstat_d.log", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0666)
+		file, err := os.OpenFile(debugLogFile, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			log.Fatal(err)
 		}

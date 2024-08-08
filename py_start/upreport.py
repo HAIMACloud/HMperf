@@ -45,9 +45,14 @@ def get_test_info(args):
         devices_name = os.popen('adb -s ' + args + ' shell getprop ro.product.model').readlines()
         android_SDK = int(os.popen('adb -s ' + args + ' shell getprop ro.build.version.sdk').readlines()[0])
         if android_SDK > 32:
-            package_name = res_expression(lb='u0 ', rb='/',
-                                          data=str(os.popen(
-                                              'adb -s ' + args + ' shell dumpsys activity | grep topResumedActivity').readlines()))
+            if platform.system().lower() == 'windows':
+                package_name = res_expression(lb='u0 ', rb='/',
+                                            data=str(os.popen(
+                                                'adb -s ' + args + ' shell dumpsys activity | findstr  topResumedActivity').readlines()))
+            else:
+                package_name = res_expression(lb='u0 ', rb='/',
+                                            data=str(os.popen(
+                                                'adb -s ' + args + ' shell dumpsys activity | grep  topResumedActivity').readlines()))
         else:
             if platform.system().lower() == 'windows':
                 package_name = res_expression(lb='u0 ', rb='/',
@@ -93,6 +98,7 @@ def up_report(args):
         'token': token
     }
     fp = open(path, 'rb')
+    print(data)
     with requests.post(url, files={'file': fp}, data=data) as response:
         msg = json.loads(response.text)
         print(msg)

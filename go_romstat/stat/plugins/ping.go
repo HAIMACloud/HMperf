@@ -1,8 +1,9 @@
+// Copyright (c) 2021-2023 https://www.haimacloud.com/
+// SPDX-License-Identifier: MIT
 package plugins
 
 import (
 	"fmt"
-
 	"romstat/stat/data"
 	"romstat/stat/utils"
 )
@@ -19,13 +20,14 @@ func (t *NetworkPingPlugin) Open() bool {
 
 func (t *NetworkPingPlugin) Close() {
 }
+
 func (t *NetworkPingPlugin) runPingSecond(count int) error {
-	shell := utils.NewAndroidShell()
-	stat, err := shell.GetPingStat("www.baidu.com", count)
+	stat, err := GetPingStat(count)
 	if err != nil {
 		utils.DebugLogger.Println("ERROR: %s", err.Error())
 		return err
 	}
+
 	statLstSize := len(t.currentStatLst)
 	if statLstSize > 1 { //save the last seconds stat data
 		t.currentStatLst = t.currentStatLst[statLstSize-1 : statLstSize]

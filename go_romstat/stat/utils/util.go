@@ -30,3 +30,8 @@ func StringInSlice(a string, list []string) bool {
 	}
 	return false
 }
+
+// func GetPingStatByFastPing(domainAddr string, packCount int) (*PingStat, error) {
+// 	p := fastping.NewPinger()
+// 	net.ResolveIPAddr("ip4:icmp", address)
+// }
