@@ -2,7 +2,7 @@
 @echo off
 
 set HmFileVersion=1.1.0
-set RomStatVersion=1.1.0
+set RomStatVersion=1.2.0
 
 echo HmFileVersion=%HmFileVersion%
 echo RomStatVersion=%RomStatVersion%

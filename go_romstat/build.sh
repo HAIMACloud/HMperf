@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 export HmFileVersion=1.1.0
-export RomStatVersion=1.1.0
+export RomStatVersion=1.2.0
 
 echo "HmFileVersion=$HmFileVersion"
 echo "RomStatVersion=$RomStatVersion"

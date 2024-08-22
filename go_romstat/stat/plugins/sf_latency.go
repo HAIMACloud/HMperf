@@ -6,10 +6,11 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"romstat/stat/data"
-	"romstat/stat/utils"
 	"sync"
 	"time"
+
+	"romstat/stat/data"
+	"romstat/stat/utils"
 )
 
 type SfFrameData struct {
@@ -44,6 +45,7 @@ type DesktopFramerateCoutner struct {
 	ctx                context.Context
 	latestPresentTs    int64
 	frameTimestampLock sync.Mutex
+	frameTimestampChan chan int64
 }
 
 type SfLatencyStatPlugin struct {

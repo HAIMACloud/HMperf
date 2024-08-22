@@ -104,8 +104,7 @@ func (dup *OutputDuplicator) ReleaseFrame() {
 		dup.acquiredFrame = false
 	}
 }
-
-func (dup *OutputDuplicator) Try2AcquireNextFrame(timeoutMs uint) error {
+func (dup *OutputDuplicator) Try2GetDesc() error {
 	var hr int32
 	desc := dxgi.DXGI_OUTDUPL_DESC{}
 	hr = dup.outputDuplication.GetDesc(&desc)
@@ -121,14 +120,16 @@ func (dup *OutputDuplicator) Try2AcquireNextFrame(timeoutMs uint) error {
 			return nil
 		}
 	}
-
+	return nil
+}
+func (dup *OutputDuplicator) Try2AcquireNextFrameExt(timeoutMs uint) error {
 	var desktop *dxgi.IDXGIResource
 	var frameInfo dxgi.DXGI_OUTDUPL_FRAME_INFO
 
 	// Release a possible previous frame
 	// TODO: Properly use ReleaseFrame...
-
 	dup.ReleaseFrame()
+
 	hrF := dup.outputDuplication.AcquireNextFrame(timeoutMs, &frameInfo, &desktop)
 	dup.acquiredFrame = true
 	if hr := d3d.HRESULT(hrF); hr.Failed() {
@@ -149,6 +150,51 @@ func (dup *OutputDuplicator) Try2AcquireNextFrame(timeoutMs uint) error {
 	}
 	return nil
 }
+
+//func (dup *OutputDuplicator) Try2AcquireNextFrame(timeoutMs uint) error {
+//	var hr int32
+//	desc := dxgi.DXGI_OUTDUPL_DESC{}
+//	hr = dup.outputDuplication.GetDesc(&desc)
+//	if hr := d3d.HRESULT(hr); hr.Failed() {
+//		return fmt.Errorf("failed to get the description. %w", hr)
+//	}
+//
+//	if desc.DesktopImageInSystemMemory != 0 {
+//		// TODO: Figure out WHEN exactly this can occur, and if we can make use of it
+//		dup.size = dxgi.POINT{X: int32(desc.ModeDesc.Width), Y: int32(desc.ModeDesc.Height)}
+//		hr = dup.outputDuplication.MapDesktopSurface(&dup.mappedRect)
+//		if hr := d3d.HRESULT(hr); !hr.Failed() {
+//			return nil
+//		}
+//	}
+//
+//	var desktop *dxgi.IDXGIResource
+//	var frameInfo dxgi.DXGI_OUTDUPL_FRAME_INFO
+//
+//	// Release a possible previous frame
+//	// TODO: Properly use ReleaseFrame...
+//	dup.ReleaseFrame()
+//
+//	hrF := dup.outputDuplication.AcquireNextFrame(timeoutMs, &frameInfo, &desktop)
+//	dup.acquiredFrame = true
+//	if hr := d3d.HRESULT(hrF); hr.Failed() {
+//		if hr == d3d.DXGI_ERROR_WAIT_TIMEOUT {
+//			return ErrNoImageYet
+//		} else if hr == d3d.DXGI_ERROR_ACCESS_LOST {
+//			return ErrDxAccessLost
+//		}
+//		return fmt.Errorf("failed to AcquireNextFrame. %w", d3d.HRESULT(hrF))
+//	}
+//	// If we do not release the frame ASAP, we only get FPS / 2 frames :/
+//	// Something wrong here?
+//	defer dup.ReleaseFrame()
+//	defer desktop.Release()
+//	if frameInfo.LastMouseUpdateTime > 0 && frameInfo.LastPresentTime == 0 {
+//		//If only mouse cursor draw
+//		return ErrNoImageYet
+//	}
+//	return nil
+//}
 
 // returns DXGI_FORMAT_B8G8R8A8_UNORM data
 func (dup *OutputDuplicator) Snapshot(timeoutMs uint) (unmapFn, *dxgi.DXGI_MAPPED_RECT, *dxgi.POINT, error) {

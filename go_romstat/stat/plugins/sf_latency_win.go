@@ -43,6 +43,7 @@ func NewDesktopFramerateCounter(log utils.Logger, maxFrames *int) *DesktopFramer
 	t.debugLog = log
 	t.ctx = context.Background()
 	t.latestPresentTs = 0
+	t.frameTimestampChan = make(chan int64, 360)
 	return t
 }
 func (t *DesktopFramerateCoutner) Stop() {
@@ -68,7 +69,17 @@ func (t *DesktopFramerateCoutner) GetNewFramesTimestamp() []int64 {
 	t.FramesTimestamp = t.FramesTimestamp[lastIdx:]
 	return retFrames
 }
-
+func (t *DesktopFramerateCoutner) asyncCollectFrameTime() {
+	for frameData := range t.frameTimestampChan {
+		t.frameTimestampLock.Lock()
+		if len(t.FramesTimestamp) >= t.maxFrames {
+			t.FramesTimestamp = append(t.FramesTimestamp[len(t.FramesTimestamp)-t.maxFrames:], frameData)
+		} else {
+			t.FramesTimestamp = append(t.FramesTimestamp, frameData)
+		}
+		t.frameTimestampLock.Unlock()
+	}
+}
 func (t *DesktopFramerateCoutner) Start() error {
 	max := screenshot.NumActiveDisplays()
 	n := max - 1
@@ -114,6 +125,10 @@ func (t *DesktopFramerateCoutner) Start() error {
 		}
 	}
 	defer ddup.Release()
+	if err := ddup.Try2GetDesc(); err != nil {
+		t.debugLog.Printf("Err ddup.Try2GetDesc: %v\n", err)
+		return &DxError{ErrCode: -1, ErrMsg: "Err ddup.Try2GetDesc: " + err.Error()}
+	}
 	for {
 		select {
 		case <-t.ctx.Done():
@@ -122,7 +137,7 @@ func (t *DesktopFramerateCoutner) Start() error {
 			break
 		}
 		// Grab an image.RGBA from the current output presenter
-		err := ddup.Try2AcquireNextFrame(100)
+		err := ddup.Try2AcquireNextFrameExt(100)
 		if errors.Is(err, outputduplication.ErrNoImageYet) {
 			continue
 		}
@@ -134,14 +149,7 @@ func (t *DesktopFramerateCoutner) Start() error {
 			t.debugLog.Printf("Err ddup.GetImage: %v\n", err)
 			return &DxError{ErrCode: -1, ErrMsg: "Err ddup.GetImage: " + err.Error()}
 		}
-		frameData := time.Now().Local().UnixNano()
-		t.frameTimestampLock.Lock()
-		if len(t.FramesTimestamp) >= t.maxFrames {
-			t.FramesTimestamp = append(t.FramesTimestamp[len(t.FramesTimestamp)-t.maxFrames:], frameData)
-		} else {
-			t.FramesTimestamp = append(t.FramesTimestamp, frameData)
-		}
-		t.frameTimestampLock.Unlock()
+		t.frameTimestampChan <- time.Now().Local().UnixNano()
 	}
 }
 
@@ -153,7 +161,9 @@ func (t *SfLatencyStatPlugin) Open() bool {
 	if t.d3dxLoopCounter == nil {
 		t.d3dxLoopCounter = NewDesktopFramerateCounter(t.debugLog, nil)
 	}
+
 	go func() {
+		go t.d3dxLoopCounter.asyncCollectFrameTime()
 		for {
 			err := t.d3dxLoopCounter.Start()
 			if err != nil && err.(*DxError).ErrCode != int64(d3d.DXGI_ERROR_ACCESS_LOST) {
